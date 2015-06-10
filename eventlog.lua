@@ -3,9 +3,13 @@ io_eventlog = nil;
 eventid = 0;
 server = getServer();
 
-function nstr(string_or_nil)
-  if string_or_nil == nil then
+function nstr(something)
+  if something == nil then
     return "";
+  elseif something == true
+    return "true";
+  elseif something == false
+    return "false";
   else
     return string_or_nil;
   end
@@ -341,7 +345,7 @@ function onPlayerConsumeItem(event)
     event.healthrestore .. " " ..
     event.hungerrestore .. " " ..
     event.thirstrestore .. " " ..
-    event.healBrokenbones
+    nstr(event.healBrokenbones)
   );
 end
 addEvent("PlayerConsumeItem", onPlayerConsumeItem);
