@@ -1,0 +1,9 @@
+<Lua-Script>
+  <Name>EventLog 0.001</Name>
+  <Description>Write a full event log</Description>
+  <File>eventlog.lua</File>
+  <Author>Getler</Author>
+  <Team>Gettysburg</Team>
+  <Website>https://github.com/Getty/risingworld-eventlog</Website>
+  <License>MIT</License>
+</Lua-Script>
