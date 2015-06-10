@@ -6,12 +6,12 @@ server = getServer();
 function nstr(something)
   if something == nil then
     return "";
-  elseif something == true
+  elseif something == true then
     return "true";
-  elseif something == false
+  elseif something == false then
     return "false";
   else
-    return string_or_nil;
+    return something;
   end
 end
 
@@ -290,15 +290,16 @@ addEvent("PlayerVegetationDestroy", onPlayerVegetationDestroy);
 
 -- PlayerChangeClothes
 
-function onPlayerChangePosition(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  PlayerEventLog("PlayerChangePosition",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "]"
-  );
-end
-addEvent("PlayerChangePosition", onPlayerChangePosition);
+-- TODO Switch for this
+-- function onPlayerChangePosition(event)
+--   local pos = event.position;
+--   local rot = event.rotation;
+--   PlayerEventLog("PlayerChangePosition",event,
+--     "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
+--     "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "]"
+--   );
+-- end
+-- addEvent("PlayerChangePosition", onPlayerChangePosition);
 
 -- PlayerSpawnChange
 
