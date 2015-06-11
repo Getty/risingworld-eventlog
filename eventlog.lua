@@ -1,280 +1,282 @@
 
+JSON = assert(loadfile "JSON.lua")()
+
 io_eventlog = nil;
 eventid = 0;
 server = getServer();
-
-function nstr(something)
-  if something == nil then
-    return "";
-  elseif something == true then
-    return "true";
-  elseif something == false then
-    return "false";
-  else
-    return something;
-  end
-end
 
 function onEnable()
   io_eventlog = io.open("eventlog.log","a+");
 end
 
-function EventLog(eventname,text)
+function EventLog(eventset)
+  io_eventlog:write(JSON:encode(eventset));
+end
+
+function getEventSet(eventname)
   eventid = eventid + 1;
-  io_eventlog:write(eventid .. " " .. os.date("%x %X") .. " [" ..
-    eventname .. "] " .. text .."\n");
+  return {
+    EventID = eventid,
+    EventName = eventname,
+    GameTimestamp = server:getGameTimestamp(),
+  };
 end
 
-function PlayerEventLog(eventname,event,extra)
-  local pos = event.player:getPosition();
-  local chunkPos = event.player:getChunkPosition();
-  EventLog(eventname,
-    event.player:getDBID() .. "(" ..
-      pos.x .. "|" .. pos.y .. "|" .. pos.z .. "X" ..
-      chunkPos.x .. "|" .. chunkPos.y .. "|" .. chunkPos.z ..
-    ")" .. " " .. nstr(extra)
-  );
+function addXYZToSet(set,key,xyz)
+  if not xyz == nil then
+    local xyzset = {
+      x = xyz.x,
+      y = xyz.y,
+      z = xyz.z,
+    };
+    set[key] = xyzset;
+  end
 end
 
-function NpcEventLog(eventname,event,extra)
-  local pos = event.npc:getPosition();
-  EventLog(eventname,
-    "NPC: " .. event.npc:getName() .. " #" .. event.npc:getID() ..
-    "(" .. event.npc:getTypeID() .. ")" ..
-    nstr(extra)
-  );
+function addChunkOffsetToSet(set,obj)
+  set["chunkOffsetX"] = obj.chunkOffsetX;
+  set["chunkOffsetY"] = obj.chunkOffsetY;
+  set["chunkOffsetZ"] = obj.chunkOffsetZ;
 end
 
-function EventChunkBlock(event)
-  return
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY .. 
-        "|" .. event.chunkOffsetZ .. "X" ..
-    event.blockPositionX .. "|" .. event.blockPositionY .. 
-        "|" .. event.blockPositionZ .. "]"
+function addBlockPositionToSet(set,obj)
+  set["blockPositionX"] = obj.blockPositionX;
+  set["blockPositionY"] = obj.blockPositionY;
+  set["blockPositionZ"] = obj.blockPositionZ;
 end
 
-function onPlayerConnect(event)
-  PlayerEventLog("PlayerConnect",event);
+function addChunkBlockToSet(set,obj)
+  addChunkOffsetToSet(set,obj);
+  addBlockPositionToSet(set,obj);
 end
-addEvent("PlayerConnect", onPlayerConnect);
 
-function onPlayerDisconnect(event)
-  PlayerEventLog("PlayerDisconnect",event);
+function addPlayerToSet(set,key,player)
+  local playerset = {
+    DBID = player:getDBID(),
+    name = player:getName(),
+  };
+  addXYZToSet(playerset,'position',player:getPosition());
+  addXYZToSet(playerset,'chunkPosition',player:getChunkPosition());
+  set[key] = playerset;
 end
-addEvent("PlayerDisconnect", onPlayerDisconnect);
 
-function onPlayerText(event)
-  PlayerEventLog("PlayerText",event,
-    "[" .. nstr(event.prefix) .. "|" .. nstr(event.text) .. "]");
+function addNpcToSet(set,key,npc)
+  local npcset = {
+    Name = npc:getName(),
+    TypeID = npc:getTypeID(),
+    ID = npc:getID(),
+  };
+  addXYZToSet(npcset,'position',npc:getPosition());
+  set[key] = npcset;
 end
-addEvent("PlayerText", onPlayerText);
 
-function onPlayerCommand(event)
-  PlayerEventLog("PlayerCommand",event,
-    "[" .. nstr(event.command) .. "]");
-end
-addEvent("PlayerCommand", onPlayerCommand);
+addEvent("PlayerConnect", function (event)
+  local set = getEventSet("PlayerConnect");
+  addPlayerToSet(set,"player",event.player);
+  EventLog(set);
+end);
 
-function onPlayerDeath(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerDeath",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "]");
-end
-addEvent("PlayerDeath", onPlayerDeath);
+addEvent("PlayerDisconnect", function (event)
+  local set = getEventSet("PlayerDisconnect");
+  addPlayerToSet(set,"player",event.player);
+  EventLog(set);
+end);
 
-function onPlayerEnterChunk(event)
-  local old = event.oldChunk;
-  local new = event.newChunk;
-  PlayerEventLog("PlayerEnterChunk",event,
-    "[" .. old.x .. "|" .. old.y .. "|" .. old.z .. "] -> " ..
-    "[" .. new.x .. "|" .. new.y .. "|" .. new.z .. "]"
-  );
-end
-addEvent("PlayerEnterChunk", onPlayerEnterChunk);
+addEvent("PlayerText", function (event)
+  local set = getEventSet("PlayerText");
+  addPlayerToSet(set,"player",event.player);
+  set["prefix"] = event.prefix;
+  set["text"] = event.text;
+  EventLog(set);
+end);
 
-function onPlayerEnterWorldpart(event)
-  local old = event.oldWorldpart;
-  local new = event.newWorldpart;
-  PlayerEventLog("PlayerEnterWorldpart",event,
-    "[" .. old.a .. "|" .. old.b .. "] -> " ..
-    "[" .. new.a .. "|" .. new.b .. "]"
-  );
-end
-addEvent("PlayerEnterWorldpart", onPlayerEnterWorldpart);
+addEvent("PlayerCommand", function (event)
+  local set = getEventSet("PlayerCommand");
+  addPlayerToSet(set,"player",event.player);
+  set["command"] = event.command;
+  EventLog(set);
+end);
 
-function onPlayerTerrainFill(event)
-  PlayerEventLog("PlayerTerrainFill",event,
-    EventChunkBlock(event) .. " " ..
-    event.newBlockID
-  );
-end
-addEvent("PlayerTerrainFill", onPlayerTerrainFill);
+addEvent("PlayerDeath", function (event)
+  local set = getEventSet("PlayerDeath");
+  addPlayerToSet(set,"player",event.player);
+  addPosToSet(set,"Position",event.position);
+  EventLog(set);
+end);
 
-function onPlayerTerrainDestroy(event)
-  PlayerEventLog("PlayerTerrainDestroy",event,
-    EventChunkBlock(event)
-  );
-end
-addEvent("PlayerTerrainDestroy", onPlayerTerrainDestroy);
+addEvent("PlayerEnterChunk", function (event)
+  local set = getEventSet("PlayerEnterChunk");
+  addPlayerToSet(set,"player",event.player);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"oldChunk",event.oldChunk);
+  addXYZToSet(set,"newChunk",event.newChunk);
+  EventLog(set);
+end);
 
-function onPlayerGrassRemove(event)
-  PlayerEventLog("PlayerGrassRemove",event,
-    EventChunkBlock(event) .. " " ..
-    event.newBlockID
-  );
-end
-addEvent("PlayerGrassRemove", onPlayerGrassRemove);
+addEvent("PlayerEnterWorldpart", function (event)
+  local set = getEventSet("PlayerEnterWorldpart");
+  addPlayerToSet(set,"player",event.player);
+  set["oldWorldPart"] = {
+    a = event.oldWorldpart.a,
+    b = event.oldWorldpart.b,
+  };
+  set["newWorldPart"] = {
+    a = event.oldWorldpart.a,
+    b = event.oldWorldpart.b,
+  };
+  EventLog(set);
+end);
 
-function onPlayerBlockPlace(event)
-  PlayerEventLog("PlayerBlockPlace",event,
-    EventChunkBlock(event) .. " " ..
-    event.newBlockID
-  );
-end
-addEvent("PlayerBlockPlace", onPlayerBlockPlace);
+addEvent("PlayerTerrainFill", function (event)
+  local set = getEventSet("PlayerTerrainFill");
+  addPlayerToSet(set,"player",event.player);
+  addChunkBlockToSet(set, event);
+  set["newBlockID"] = event.newBlockID;
+  EventLog(set);
+end);
 
-function onPlayerBlockDestroy(event)
-  PlayerEventLog("PlayerBlockDestroy",event,
-    EventChunkBlock(event) .. " " ..
-    event.oldBlockID
-  );
-end
-addEvent("PlayerBlockDestroy", onPlayerBlockDestroy);
+addEvent("PlayerTerrainDestroy", function (event)
+  local set = getEventSet("PlayerTerrainDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addChunkBlockToSet(set, event);
+  EventLog(set);
+end);
 
-function onPlayerConstructionPlace(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  local size = event.size;
-  PlayerEventLog("PlayerConstructionPlace",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    "[" .. size.x .. "|" .. size.y .. "|" .. size.z .. "] " ..
-    event.textureID .. " " .. event.constructionID
-  );
-end
-addEvent("PlayerConstructionPlace", onPlayerConstructionPlace);
+addEvent("PlayerGrassRemove", function (event)
+  local set = getEventSet("PlayerGrassRemove");
+  addPlayerToSet(set,"player",event.player);
+  addChunkBlockToSet(set, event);
+  set["newBlockID"] = event.newBlockID;
+  EventLog(set);
+end);
 
-function onPlayerConstructionDestroy(event)
-  local pos = event.position;
-  local size = event.size;
-  PlayerEventLog("PlayerConstructionDestroy",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    "[" .. size.x .. "|" .. size.y .. "|" .. size.z .. "] " ..
-    event.constructionID
-  );
-end
-addEvent("PlayerConstructionDestroy", onPlayerConstructionDestroy);
+addEvent("PlayerBlockPlace", function (event)
+  local set = getEventSet("PlayerBlockPlace");
+  addPlayerToSet(set,"player",event.player);
+  addChunkBlockToSet(set, event);
+  set["newBlockID"] = event.newBlockID;
+  EventLog(set);
+end);
 
-function onPlayerConstructionRemove(event)
-  local pos = event.position;
-  local size = event.size;
-  PlayerEventLog("PlayerConstructionRemove",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    "[" .. size.x .. "|" .. size.y .. "|" .. size.z .. "] " ..
-    event.constructionID
-  );
-end
-addEvent("PlayerConstructionRemove", onPlayerConstructionRemove);
+addEvent("PlayerBlockDestroy", function (event)
+  local set = getEventSet("PlayerBlockDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addChunkBlockToSet(set, event);
+  set["oldBlockID"] = event.oldBlockID;
+  EventLog(set);
+end);
 
-function onPlayerObjectPlace(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  PlayerEventLog("PlayerObjectPlace",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.variation .. " " .. event.objectTypeID .. " " ..
-    event.info
-  );
-end
-addEvent("PlayerObjectPlace", onPlayerObjectPlace);
+addEvent("PlayerConstructionPlace", function (event)
+  local set = getEventSet("PlayerConstructionPlace");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"rotation",event.rotation);
+  addXYZToSet(set,"size",event.size);
+  set["textureID"] = event.textureID;
+  set["constructionID"] = event.constructionID;
+  EventLog(set);
+end);
 
-function onPlayerObjectPickup(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerObjectPickup",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.objectTypeID
-  );
-end
-addEvent("PlayerObjectPickup", onPlayerObjectPickup);
+addEvent("PlayerConstructionDestroy", function (event)
+  local set = getEventSet("PlayerConstructionDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"size",event.size);
+  set["constructionID"] = event.constructionID;
+  EventLog(set);
+end);
 
-function onPlayerObjectRemove(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerObjectRemove",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.objectTypeID
-  );
-end
-addEvent("PlayerObjectRemove", onPlayerObjectRemove);
+addEvent("PlayerConstructionRemove", function (event)
+  local set = getEventSet("PlayerConstructionRemove");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"size",event.size);
+  set["constructionID"] = event.constructionID;
+  EventLog(set);
+end);
 
-function onPlayerObjectDestroy(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerObjectDestroy",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.objectTypeID
-  );
-end
-addEvent("PlayerObjectDestroy", onPlayerObjectDestroy);
+addEvent("PlayerObjectPlace", function (event)
+  local set = getEventSet("PlayerObjectPlace");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"rotation",event.rotation);
+  set["variation"] = event.variation;
+  set["info"] = event.info;
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerObjectStatusChange(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerObjectStatusChange",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.objectTypeID .. " " ..
-    event.newStatus .. " -> " .. event.oldStatus
-  );
-end
-addEvent("PlayerObjectStatusChange", onPlayerObjectStatusChange);
+addEvent("PlayerObjectPickup", function (event)
+  local set = getEventSet("PlayerObjectPickup");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerVegetationPlace(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  PlayerEventLog("PlayerVegetationPlace",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.variation .. " " .. event.plantTypeID
-  );
-end
-addEvent("PlayerVegetationPlace", onPlayerVegetationPlace);
+addEvent("PlayerObjectRemove", function (event)
+  local set = getEventSet("PlayerObjectRemove");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerVegetationPickup(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerVegetationPickup",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.plantTypeID
-  );
-end
-addEvent("PlayerVegetationPickup", onPlayerVegetationPickup);
+addEvent("PlayerObjectDestroy", function (event)
+  local set = getEventSet("PlayerObjectDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerVegetationDestroy(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerVegetationDestroy",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.playerTypeID
-  );
-end
-addEvent("PlayerVegetationDestroy", onPlayerVegetationDestroy);
+addEvent("PlayerObjectStatusChange", function (event)
+  local set = getEventSet("PlayerObjectStatusChange");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  set["objectTypeID"] = event.objectTypeID;
+  set["newStatus"] = event.newStatus;
+  set["oldStatus"] = event.oldStatus;
+  EventLog(set);
+end);
+
+addEvent("PlayerVegetationPlace", function (event)
+  local set = getEventSet("PlayerVegetationPlace");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"rotation",event.rotation);
+  set["variation"] = event.variation;
+  set["plantTypeID"] = event.plantTypeID;
+  EventLog(set);
+end);
+
+addEvent("PlayerVegetationPickup", function (event)
+  local set = getEventSet("PlayerVegetationPickup");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  set["plantTypeID"] = event.plantTypeID;
+  EventLog(set);
+end);
+
+addEvent("PlayerVegetationDestroy", function (event)
+  local set = getEventSet("PlayerVegetationDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addChunkOffsetToSet(set, event);
+  addXYZToSet(set,"position",event.position);
+  -- corrected the type in the Lua class
+  set["plantTypeID"] = event.playerTypeID;
+  EventLog(set);
+end);
 
 -- PlayerPressKey
 
@@ -307,21 +309,21 @@ addEvent("PlayerVegetationDestroy", onPlayerVegetationDestroy);
 
 -- PlayerInventoryChange
 
-function onPlayerQuickslotChange(event)
-  local old = event.oldFocus;
-  local new = event.newFocus;
-  PlayerEventLog("PlayerQuickslotChange",event,
-    old .. " -> " .. new
-  );
-end
-addEvent("PlayerQuickslotChange", onPlayerQuickslotChange);
+addEvent("PlayerQuickslotChange", function (event)
+  local set = getEventSet("PlayerQuickslotChange");
+  addPlayerToSet(set,"player",event.player);
+  set["oldFocus"] = event.oldFocus;
+  set["newFocus"] = event.newFocus;
+  EventLog(set);
+end);
 
-function onPlayerDamage(event)
-  PlayerEventLog("PlayerDamage",event,
-    event.oldHealth .. " " .. event.damage
-  );
-end
-addEvent("PlayerDamage", onPlayerDamage);
+addEvent("PlayerDamage", function (event)
+  local set = getEventSet("PlayerDamage");
+  addPlayerToSet(set,"player",event.player);
+  set["oldHealth"] = event.oldHealth;
+  set["damage"] = event.damage;
+  EventLog(set);
+end);
 
 -- function onPlayerHit(event)
 --   local damage = event.damagePoint;
@@ -330,111 +332,105 @@ addEvent("PlayerDamage", onPlayerDamage);
 -- end
 -- addEvent("PlayerHit", onPlayerHit);
 
-function onPlayerRespawn(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  PlayerEventLog("PlayerRespawn",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "]"
-    -- more todo
-  );
-end
-addEvent("PlayerRespawn", onPlayerRespawn);
+addEvent("PlayerRespawn", function (event)
+  local set = getEventSet("PlayerRespawn");
+  addPlayerToSet(set,"player",event.player);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"rotation",event.rotation);
+  EventLog(set);
+end);
 
-function onPlayerConsumeItem(event)
-  PlayerEventLog("PlayerConsumeItem",event,
-    event.healthrestore .. " " ..
-    event.hungerrestore .. " " ..
-    event.thirstrestore .. " " ..
-    nstr(event.healBrokenbones)
-  );
-end
-addEvent("PlayerConsumeItem", onPlayerConsumeItem);
+addEvent("PlayerConsumeItem", function (event)
+  local set = getEventSet("PlayerConsumeItem");
+  addPlayerToSet(set,"player",event.player);
+  set["healthrestore"] = event.healthrestore;
+  set["hungerrestore"] = event.hungerrestore;
+  set["thirstrestore"] = event.thirstrestore;
+  set["healBrokenbones"] = event.healBrokenbones;
+  EventLog(set);
+end);
 
-function onPlayerChestRemove(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerChestRemove",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.chestID .. " " .. event.objectTypeID
-  );
-end
-addEvent("PlayerChestRemove", onPlayerChestRemove);
+addEvent("PlayerChestRemove", function (event)
+  local set = getEventSet("PlayerChestRemove");
+  addPlayerToSet(set,"player",event.player);
+  addXYZToSet(set,"position",event.position);
+  addChunkOffsetToSet(set, event);
+  set["chestID"] = event.chestID;
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerChestDestroy(event)
-  local pos = event.position;
-  PlayerEventLog("PlayerChestDestroy",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.chestID .. " " .. event.objectTypeID
-  );
-end
-addEvent("PlayerChestDestroy", onPlayerChestDestroy);
+addEvent("PlayerChestDestroy", function (event)
+  local set = getEventSet("PlayerChestDestroy");
+  addPlayerToSet(set,"player",event.player);
+  addXYZToSet(set,"position",event.position);
+  addChunkOffsetToSet(set, event);
+  set["chestID"] = event.chestID;
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onPlayerChestPlace(event)
-  local pos = event.position;
-  local rot = event.rotation;
-  PlayerEventLog("PlayerChestPlace",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    "[" .. rot.x .. "|" .. rot.y .. "|" .. rot.z .. "] " ..
-    "[" .. event.chunkOffsetX .. "|" .. event.chunkOffsetY ..
-        "|" .. event.chunkOffsetZ .. "] " ..
-    event.chestID .. " <- " .. event.objectTypeID
-  );
-end
-addEvent("PlayerChestPlace", onPlayerChestPlace);
+addEvent("PlayerChestPlace", function (event)
+  local set = getEventSet("PlayerChestPlace");
+  addPlayerToSet(set,"player",event.player);
+  addXYZToSet(set,"position",event.position);
+  addXYZToSet(set,"rotation",event.rotation);
+  addChunkOffsetToSet(set, event);
+  set["chestID"] = event.chestID;
+  set["objectTypeID"] = event.objectTypeID;
+  EventLog(set);
+end);
 
-function onChestToInventory(event)
-  PlayerEventLog("ChestToInventory",event,
-    event.chestID .. " " .. event.chestslot .. " -> " ..
-    event.inventorytype .. " " .. event.inventoryslot
-  );
-end
-addEvent("ChestToInventory", onChestToInventory);
+addEvent("ChestToInventory", function (event)
+  local set = getEventSet("ChestToInventory");
+  addPlayerToSet(set,"player",event.player);
+  set["chestID"] = event.chestID;
+  set["chestslot"] = event.chestslot;
+  set["inventorytype"] = event.inventorytype;
+  set["inventoryslot"] = event.inventoryslot;
+  EventLog(set);
+end);
 
-function onInventoryToChest(event)
-  PlayerEventLog("InventoryToChest",event,
-    event.chestID .. " " .. event.chestslot .. " <- " ..
-    event.inventorytype .. " " .. event.inventoryslot
-  );
-end
-addEvent("InventoryToChest", onInventoryToChest);
+addEvent("InventoryToChest", function (event)
+  local set = getEventSet("InventoryToChest");
+  addPlayerToSet(set,"player",event.player);
+  set["chestID"] = event.chestID;
+  set["chestslot"] = event.chestslot;
+  set["inventorytype"] = event.inventorytype;
+  set["inventoryslot"] = event.inventoryslot;
+  EventLog(set);
+end);
 
-function onChestItemDrop(event)
-  PlayerEventLog("ChestItemDrop",event,
-    event.chestID .. " " .. event.chestslot
-  );
-end
-addEvent("ChestItemDrop", onChestItemDrop);
+addEvent("ChestItemDrop", function (event)
+  local set = getEventSet("ChestItemDrop");
+  addPlayerToSet(set,"player",event.player);
+  set["chestID"] = event.chestID;
+  set["chestslot"] = event.chestslot;
+  EventLog(set);
+end);
 
-function onNpcDeath(event)
-  local pos = event.position;
-  NpcEventLog("NpcDeath",event,
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "]"
-  );
-end
-addEvent("NpcDeath", onNpcDeath);
+addEvent("NpcDeath", function (event)
+  local set = getEventSet("NpcDeath");
+  addNpcToSet(set,"npc",event.npc);
+  addXYZToSet(set,"position",event.position);
+  EventLog(set);
+end);
 
-function onNpcHit(event)
-  PlayerEventLog("NpcHit",event,
-    "NPC: " .. event.targetNpc:getName() ..
-    " #" .. event.targetNpc:getID() ..
-    "(" .. event.targetNpc:getTypeID() .. ")" ..
-    event.distanceSquared .. " " .. event.damage
-  );
-end
-addEvent("NpcHit", onNpcHit);
+addEvent("NpcHit", function (event)
+  local set = getEventSet("NpcHit");
+  addPlayerToSet(set,"player",event.player);
+  addNpcToSet(set,"targetNpc",event.targetNpc);
+  set["distanceSquared"] = event.distanceSquared;
+  set["damage"] = event.damage;
+  EventLog(set);
+end);
 
-function onNpcSpawn(event)
-  local pos = event.position;
-  EventLog("NpcDeath",
-    "[" .. pos.x .. "|" .. pos.y .. "|" .. pos.z .. "] " ..
-    event.typeID
-  );
-end
-addEvent("NpcSpawn", onNpcSpawn);
+addEvent("NpcHit", function (event)
+  local set = getEventSet("NpcSpawn");
+  addXYZToSet(set,"position",event.position);
+  set["typeID"] = event.typeID;
+  EventLog(set);
+end);
 
 -- ItemPickup
 
