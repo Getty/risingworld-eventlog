@@ -100,7 +100,7 @@ end);
 addEvent("PlayerDeath", function (event)
   local set = getEventSet("PlayerDeath");
   addPlayerToSet(set,"player",event.player);
-  addPosToSet(set,"Position",event.position);
+  addXYZToSet(set,"Position",event.position);
   EventLog(set);
 end);
 
