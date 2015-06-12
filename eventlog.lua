@@ -24,12 +24,11 @@ end
 
 function addXYZToSet(set,key,xyz)
   if not xyz == nil then
-    local xyzset = {
+    set[key] = {
       x = xyz.x,
       y = xyz.y,
       z = xyz.z,
     };
-    set[key] = xyzset;
   end
 end
 
@@ -107,7 +106,6 @@ end);
 addEvent("PlayerEnterChunk", function (event)
   local set = getEventSet("PlayerEnterChunk");
   addPlayerToSet(set,"player",event.player);
-  addXYZToSet(set,"position",event.position);
   addXYZToSet(set,"oldChunk",event.oldChunk);
   addXYZToSet(set,"newChunk",event.newChunk);
   EventLog(set);
