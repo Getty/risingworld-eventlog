@@ -10,7 +10,7 @@ function onEnable()
 end
 
 function EventLog(eventset)
-  io_eventlog:write(JSON:encode(eventset));
+  io_eventlog:write(JSON:encode(eventset) .. "\n");
 end
 
 function getEventSet(eventname)
