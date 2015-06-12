@@ -23,13 +23,13 @@ function getEventSet(eventname)
 end
 
 function addXYZToSet(set,key,xyz)
-  if not xyz == nil then
+  pcall(function()
     set[key] = {
       x = xyz.x,
       y = xyz.y,
       z = xyz.z,
     };
-  end
+  end)
 end
 
 function addChunkOffsetToSet(set,obj)
