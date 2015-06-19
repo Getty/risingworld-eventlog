@@ -1,5 +1,5 @@
 <Lua-Script>
-  <Name>EventLog 0.001</Name>
+  <Name>EventLog</Name>
   <Description>Write a full event log</Description>
   <File>eventlog.lua</File>
   <Author>Getler</Author>
